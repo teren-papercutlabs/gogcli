@@ -35,6 +35,7 @@ type SheetsCmd struct {
 	Create   SheetsCreateCmd   `cmd:"" name:"create" aliases:"new" help:"Create a new spreadsheet"`
 	Copy     SheetsCopyCmd     `cmd:"" name:"copy" aliases:"cp,duplicate" help:"Copy a Google Sheet"`
 	Export   SheetsExportCmd   `cmd:"" name:"export" aliases:"download,dl" help:"Export a Google Sheet (pdf|xlsx|csv) via Drive"`
+	Raw      SheetsRawCmd      `cmd:"" name:"raw" help:"Pass a raw batchUpdate request directly to the Sheets API (JSON via stdin/file)"`
 }
 
 type SheetsExportCmd struct {

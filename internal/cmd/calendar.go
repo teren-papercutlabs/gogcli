@@ -32,6 +32,7 @@ type CalendarCmd struct {
 	FocusTime       CalendarFocusTimeCmd       `cmd:"" name:"focus-time" aliases:"focus" help:"Create a Focus Time block"`
 	OOO             CalendarOOOCmd             `cmd:"" name:"out-of-office" aliases:"ooo" help:"Create an Out of Office event"`
 	WorkingLocation CalendarWorkingLocationCmd `cmd:"" name:"working-location" aliases:"wl" help:"Set working location (home/office/custom)"`
+	Raw             CalendarRawCmd             `cmd:"" name:"raw" help:"Pass a raw request body directly to a Calendar API endpoint (JSON via stdin/file)"`
 }
 
 type CalendarCalendarsCmd struct {

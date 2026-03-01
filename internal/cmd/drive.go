@@ -77,6 +77,7 @@ type DriveCmd struct {
 	URL         DriveURLCmd         `cmd:"" name:"url" help:"Print web URLs for files"`
 	Comments    DriveCommentsCmd    `cmd:"" name:"comments" help:"Manage comments on files"`
 	Drives      DriveDrivesCmd      `cmd:"" name:"drives" help:"List shared drives (Team Drives)"`
+	Raw         DriveRawCmd         `cmd:"" name:"raw" help:"Pass a raw request body directly to a Drive API endpoint (JSON via stdin/file)"`
 }
 
 type DriveLsCmd struct {

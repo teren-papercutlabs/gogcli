@@ -29,6 +29,7 @@ type GmailCmd struct {
 
 	Labels GmailLabelsCmd `cmd:"" name:"labels" aliases:"label" group:"Organize" help:"Label operations"`
 	Batch  GmailBatchCmd  `cmd:"" name:"batch" group:"Organize" help:"Batch operations"`
+	Raw    GmailRawCmd    `cmd:"" name:"raw" group:"Organize" help:"Pass a raw request body directly to a Gmail API endpoint (JSON via stdin/file)"`
 
 	Send   GmailSendCmd   `cmd:"" name:"send" group:"Write" help:"Send an email"`
 	Track  GmailTrackCmd  `cmd:"" name:"track" group:"Write" help:"Email open tracking"`

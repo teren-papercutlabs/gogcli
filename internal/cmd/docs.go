@@ -38,6 +38,7 @@ type DocsCmd struct {
 	Edit        DocsEditCmd        `cmd:"" name:"edit" help:"Find and replace text in a Google Doc"`
 	Sed         DocsSedCmd         `cmd:"" name:"sed" help:"Regex find/replace (sed-style: s/pattern/replacement/g)"`
 	Clear       DocsClearCmd       `cmd:"" name:"clear" help:"Clear all content from a Google Doc"`
+	Raw         DocsRawCmd         `cmd:"" name:"raw" help:"Pass a raw batchUpdate request directly to the Docs API (JSON via stdin/file)"`
 }
 type DocsExportCmd struct {
 	DocID  string         `arg:"" name:"docId" help:"Doc ID"`
