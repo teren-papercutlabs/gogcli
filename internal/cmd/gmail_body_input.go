@@ -8,6 +8,26 @@ import (
 	"github.com/steipete/gogcli/internal/config"
 )
 
+func resolveBodyHTMLInput(bodyHTML, bodyHTMLFile string) (string, error) {
+	bodyHTMLFile = strings.TrimSpace(bodyHTMLFile)
+	if bodyHTMLFile == "" {
+		return bodyHTML, nil
+	}
+	if strings.TrimSpace(bodyHTML) != "" {
+		return "", usage("use only one of --body-html or --body-html-file")
+	}
+
+	expanded, err := config.ExpandPath(bodyHTMLFile)
+	if err != nil {
+		return "", err
+	}
+	b, err := os.ReadFile(expanded) //nolint:gosec // user-provided path
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
 func resolveBodyInput(body, bodyFile string) (string, error) {
 	bodyFile = strings.TrimSpace(bodyFile)
 	if bodyFile == "" {

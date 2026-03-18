@@ -25,6 +25,7 @@ type GmailSendCmd struct {
 	Body             string   `name:"body" help:"Body (plain text; required unless --body-html is set)"`
 	BodyFile         string   `name:"body-file" help:"Body file path (plain text; '-' for stdin)"`
 	BodyHTML         string   `name:"body-html" help:"Body (HTML; optional)"`
+	BodyHTMLFile     string   `name:"body-html-file" help:"Body file path (HTML; reads file content as HTML body)"`
 	ReplyToMessageID string   `name:"reply-to-message-id" aliases:"in-reply-to" help:"Reply to Gmail message ID (sets In-Reply-To/References and thread)"`
 	ThreadID         string   `name:"thread-id" help:"Reply within a Gmail thread (uses latest message for headers)"`
 	ReplyAll         bool     `name:"reply-all" help:"Auto-populate recipients from original message (requires --reply-to-message-id or --thread-id)"`
@@ -73,6 +74,11 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
+	bodyHTML, err := resolveBodyHTMLInput(c.BodyHTML, c.BodyHTMLFile)
+	if err != nil {
+		return err
+	}
+
 	if replyToMessageID != "" && threadID != "" {
 		return usage("use only one of --reply-to-message-id or --thread-id")
 	}
@@ -94,13 +100,13 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if strings.TrimSpace(c.Subject) == "" {
 		return usage("required: --subject")
 	}
-	if strings.TrimSpace(body) == "" && strings.TrimSpace(c.BodyHTML) == "" {
-		return usage("required: --body, --body-file, or --body-html")
+	if strings.TrimSpace(body) == "" && strings.TrimSpace(bodyHTML) == "" {
+		return usage("required: --body, --body-file, --body-html, or --body-html-file")
 	}
 	if c.TrackSplit && !c.Track {
 		return usage("--track-split requires --track")
 	}
-	if c.Track && strings.TrimSpace(c.BodyHTML) == "" {
+	if c.Track && strings.TrimSpace(bodyHTML) == "" {
 		return fmt.Errorf("--track requires --body-html (pixel must be in HTML)")
 	}
 
@@ -124,7 +130,7 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		"reply_to":            strings.TrimSpace(c.ReplyTo),
 		"from":                strings.TrimSpace(c.From),
 		"body_len":            len(strings.TrimSpace(body)),
-		"body_html_len":       len(strings.TrimSpace(c.BodyHTML)),
+		"body_html_len":       len(strings.TrimSpace(bodyHTML)),
 		"attachments":         attachPaths,
 		"track":               c.Track,
 		"track_split":         c.TrackSplit,
@@ -192,7 +198,7 @@ func (c *GmailSendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
-	body, htmlBody := applyQuoteToBodies(body, c.BodyHTML, c.Quote, replyInfo)
+	body, htmlBody := applyQuoteToBodies(body, bodyHTML, c.Quote, replyInfo)
 
 	// Determine recipients
 	var toRecipients, ccRecipients []string
