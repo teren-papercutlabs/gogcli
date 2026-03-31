@@ -19,7 +19,7 @@ import (
 var newGmailService = googleapi.NewGmail
 
 type GmailCmd struct {
-	Search     GmailSearchCmd     `cmd:"" name:"search" aliases:"find,query,ls,list" group:"Read" help:"Search threads using Gmail query syntax"`
+	Search     GmailSearchCmd     `cmd:"" name:"search" aliases:"find,query,ls,list" group:"Read" help:"Search messages using Gmail query syntax (returns message IDs; use --threads for thread-level results)"`
 	Messages   GmailMessagesCmd   `cmd:"" name:"messages" aliases:"message,msg,msgs" group:"Read" help:"Message operations"`
 	Thread     GmailThreadCmd     `cmd:"" name:"thread" aliases:"threads,read" group:"Organize" help:"Thread operations (get, modify)"`
 	Get        GmailGetCmd        `cmd:"" name:"get" aliases:"info,show" group:"Read" help:"Get a message (full|metadata|raw)"`
@@ -58,17 +58,147 @@ type GmailSettingsCmd struct {
 }
 
 type GmailSearchCmd struct {
-	Query     []string `arg:"" name:"query" help:"Search query"`
-	Max       int64    `name:"max" aliases:"limit" help:"Max results" default:"10"`
-	Page      string   `name:"page" aliases:"cursor" help:"Page token"`
-	All       bool     `name:"all" aliases:"all-pages,allpages" help:"Fetch all pages"`
-	FailEmpty bool     `name:"fail-empty" aliases:"non-empty,require-results" help:"Exit with code 3 if no results"`
-	Oldest    bool     `name:"oldest" help:"Show first message date instead of last"`
-	Timezone  string   `name:"timezone" short:"z" help:"Output timezone (IANA name, e.g. America/New_York, UTC). Default: local"`
-	Local     bool     `name:"local" help:"Use local timezone (default behavior, useful to override --timezone)"`
+	Query       []string `arg:"" name:"query" help:"Search query"`
+	Max         int64    `name:"max" aliases:"limit" help:"Max results" default:"10"`
+	Page        string   `name:"page" aliases:"cursor" help:"Page token"`
+	All         bool     `name:"all" aliases:"all-pages,allpages" help:"Fetch all pages"`
+	FailEmpty   bool     `name:"fail-empty" aliases:"non-empty,require-results" help:"Exit with code 3 if no results"`
+	Timezone    string   `name:"timezone" short:"z" help:"Output timezone (IANA name, e.g. America/New_York, UTC). Default: local"`
+	Local       bool     `name:"local" help:"Use local timezone (default behavior, useful to override --timezone)"`
+	IncludeBody bool     `name:"include-body" help:"Include decoded message body (JSON is full; text output is truncated)"`
+	Threads     bool     `name:"threads" help:"Return thread-level results (thread IDs) instead of message-level results"`
+	// Oldest is kept for backward compat when --threads is used
+	Oldest bool `name:"oldest" help:"(--threads mode) Show first message date instead of last"`
 }
 
 func (c *GmailSearchCmd) Run(ctx context.Context, flags *RootFlags) error {
+	if c.Threads {
+		return c.runThreadSearch(ctx, flags)
+	}
+	return c.runMessageSearch(ctx, flags)
+}
+
+// runMessageSearch is the default: uses messages.list, returns message IDs composable with `gmail get`.
+func (c *GmailSearchCmd) runMessageSearch(ctx context.Context, flags *RootFlags) error {
+	u := ui.FromContext(ctx)
+	account, err := requireAccount(flags)
+	if err != nil {
+		return err
+	}
+	query := strings.TrimSpace(strings.Join(c.Query, " "))
+	if query == "" {
+		return usage("missing query")
+	}
+
+	svc, err := newGmailService(ctx, account)
+	if err != nil {
+		return err
+	}
+
+	fetch := func(pageToken string) ([]*gmail.Message, string, error) {
+		call := svc.Users.Messages.List("me").
+			Q(query).
+			MaxResults(c.Max).
+			Fields("messages(id,threadId),nextPageToken").
+			Context(ctx)
+		if strings.TrimSpace(pageToken) != "" {
+			call = call.PageToken(pageToken)
+		}
+		resp, callErr := call.Do()
+		if callErr != nil {
+			return nil, "", callErr
+		}
+		return resp.Messages, resp.NextPageToken, nil
+	}
+
+	var messages []*gmail.Message
+	nextPageToken := ""
+	if c.All {
+		all, collectErr := collectAllPages(c.Page, fetch)
+		if collectErr != nil {
+			return collectErr
+		}
+		messages = all
+	} else {
+		messagesPage, pageToken, fetchErr := fetch(c.Page)
+		if fetchErr != nil {
+			return fetchErr
+		}
+		messages = messagesPage
+		nextPageToken = pageToken
+	}
+
+	if len(messages) == 0 {
+		if outfmt.IsJSON(ctx) {
+			if writeErr := outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+				"messages":      []messageItem{},
+				"nextPageToken": nextPageToken,
+			}); writeErr != nil {
+				return writeErr
+			}
+			return failEmptyExit(c.FailEmpty)
+		}
+		u.Err().Println("No results")
+		return failEmptyExit(c.FailEmpty)
+	}
+
+	idToName, err := fetchLabelIDToName(svc)
+	if err != nil {
+		return err
+	}
+
+	loc, err := resolveOutputLocation(c.Timezone, c.Local)
+	if err != nil {
+		return err
+	}
+
+	items, err := fetchMessageDetails(ctx, svc, messages, idToName, loc, c.IncludeBody)
+	if err != nil {
+		return err
+	}
+
+	if outfmt.IsJSON(ctx) {
+		if writeErr := outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+			"messages":      items,
+			"nextPageToken": nextPageToken,
+		}); writeErr != nil {
+			return writeErr
+		}
+		if len(items) == 0 {
+			return failEmptyExit(c.FailEmpty)
+		}
+		return nil
+	}
+
+	if len(items) == 0 {
+		u.Err().Println("No results")
+		return failEmptyExit(c.FailEmpty)
+	}
+
+	w, flush := tableWriter(ctx)
+	defer flush()
+
+	if c.IncludeBody {
+		fmt.Fprintln(w, "ID\tTHREAD\tDATE\tFROM\tSUBJECT\tLABELS\tBODY")
+	} else {
+		fmt.Fprintln(w, "ID\tTHREAD\tDATE\tFROM\tSUBJECT\tLABELS")
+	}
+	for _, it := range items {
+		body := ""
+		if c.IncludeBody {
+			body = sanitizeMessageBody(it.Body)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", it.ID, it.ThreadID, it.Date, it.From, it.Subject, strings.Join(it.Labels, ","), body)
+		} else {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", it.ID, it.ThreadID, it.Date, it.From, it.Subject, strings.Join(it.Labels, ","))
+		}
+	}
+	printNextPageHint(u, nextPageToken)
+	return nil
+}
+
+// runThreadSearch is the legacy path: uses threads.list, returns thread IDs.
+// Activated via --threads flag.
+func (c *GmailSearchCmd) runThreadSearch(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
 	account, err := requireAccount(flags)
 	if err != nil {
