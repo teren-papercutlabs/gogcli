@@ -52,6 +52,9 @@ type CalendarCreateCmd struct {
 }
 
 func (c *CalendarCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
+	if !flags.DryRun {
+		fmt.Fprintln(os.Stderr, "NOTE: If work happens at this slot (sync, call, working session, 1:1), use `pcl meeting create` instead — that wires WB linkage, T-30 worker auto-spawn, and dev.meetings record. `gog calendar create` is fine for read-only blocks, holds, or events with no agent/human work at the slot.")
+	}
 	u := ui.FromContext(ctx)
 	calendarID := strings.TrimSpace(c.CalendarID)
 	if calendarID == "" {
