@@ -139,6 +139,17 @@ func fileKeyringPasswordFunc() keyring.PromptFunc {
 	return fileKeyringPasswordFuncFrom(password, passwordSet, term.IsTerminal(int(os.Stdin.Fd())))
 }
 
+func IsMissingKeyringPasswordError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, errNoTTY) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "no TTY available for keyring file backend password prompt") && strings.Contains(msg, keyringPasswordEnv)
+}
+
 func normalizeKeyringBackend(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }

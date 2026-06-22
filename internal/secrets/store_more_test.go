@@ -3,6 +3,7 @@ package secrets
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"runtime"
 	"strings"
 	"testing"
@@ -125,6 +126,22 @@ func TestFileKeyringPasswordFuncFrom(t *testing.T) {
 	fn = fileKeyringPasswordFuncFrom("", false, false)
 	if _, err := fn("prompt"); err == nil || !errors.Is(err, errNoTTY) {
 		t.Fatalf("expected no TTY error, got: %v", err)
+	}
+}
+
+func TestIsMissingKeyringPasswordError(t *testing.T) {
+	wrapped := fmt.Errorf("open keyring: %w", errNoTTY)
+	if !IsMissingKeyringPasswordError(wrapped) {
+		t.Fatalf("expected wrapped errNoTTY to be detected")
+	}
+
+	textOnly := errors.New("open secrets store: no TTY available for keyring file backend password prompt; set GOG_KEYRING_PASSWORD")
+	if !IsMissingKeyringPasswordError(textOnly) {
+		t.Fatalf("expected text-only missing-password error to be detected")
+	}
+
+	if IsMissingKeyringPasswordError(errors.New("unrelated keyring failure")) {
+		t.Fatalf("unexpected detection for unrelated error")
 	}
 }
 

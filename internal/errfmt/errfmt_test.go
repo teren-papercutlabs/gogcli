@@ -50,6 +50,15 @@ func TestFormat_KeyNotFound(t *testing.T) {
 	}
 }
 
+func TestFormat_MissingKeyringPassword(t *testing.T) {
+	err := errors.New("open secrets store: open keyring: no TTY available for keyring file backend password prompt; set GOG_KEYRING_PASSWORD")
+	got := Format(err)
+
+	if !containsAll(got, "GOG_KEYRING_PASSWORD not set", "source ~/.marshal/secrets.env", "--account") {
+		t.Fatalf("unexpected: %q", got)
+	}
+}
+
 func TestFormat_UserFacingError(t *testing.T) {
 	err := NewUserFacingError("friendly", errNope)
 	got := Format(err)

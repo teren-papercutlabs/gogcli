@@ -12,6 +12,7 @@ import (
 
 	"github.com/steipete/gogcli/internal/config"
 	gogapi "github.com/steipete/gogcli/internal/googleapi"
+	"github.com/steipete/gogcli/internal/secrets"
 )
 
 func Format(err error) string {
@@ -43,6 +44,15 @@ func Format(err error) string {
 			"OAuth client credentials missing (OAuth client ID JSON).\nDownload from: https://console.cloud.google.com/apis/credentials (Create Credentials → OAuth client ID → Desktop app → Download JSON)\nThen run: gog auth credentials <credentials.json> (expected at %s)",
 			credErr.Path,
 		)
+	}
+
+	if secrets.IsMissingKeyringPasswordError(err) {
+		return `GOG_KEYRING_PASSWORD not set — export it to unlock gog's file keyring in this non-interactive session.
+
+For PcL agent/clone sessions, load it from ~/.marshal/secrets.env before running gog:
+  set -a; source ~/.marshal/secrets.env; set +a
+
+Then retry the gog command with --account <email>.`
 	}
 
 	if errors.Is(err, keyring.ErrKeyNotFound) {
