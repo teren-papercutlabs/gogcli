@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -136,7 +138,34 @@ func fileKeyringPasswordFuncFrom(password string, passwordSet bool, isTTY bool) 
 
 func fileKeyringPasswordFunc() keyring.PromptFunc {
 	password, passwordSet := os.LookupEnv(keyringPasswordEnv)
+	if !passwordSet {
+		if home, err := os.UserHomeDir(); err == nil {
+			password, passwordSet = pclSecretsKeyringPassword(filepath.Join(home, ".pcl", "secrets.env"))
+		}
+	}
 	return fileKeyringPasswordFuncFrom(password, passwordSet, term.IsTerminal(int(os.Stdin.Fd())))
+}
+
+// pclSecretsKeyringPassword reads GOG_KEYRING_PASSWORD, and only that name, from PcL's
+// canonical secrets file when the environment does not carry it (PcL-local, PCL-385).
+// The file is sourced by a clean zsh child whose only output is that one value, so
+// no other credential in the file reaches this process or its caller's environment.
+func pclSecretsKeyringPassword(source string) (string, bool) {
+	if _, err := os.Stat(source); err != nil {
+		return "", false
+	}
+	script := `unsetopt xtrace; source "$1" >/dev/null 2>&1 || exit 1; builtin print -rn -- "${GOG_KEYRING_PASSWORD-}."`
+	cmd := exec.Command("/bin/zsh", "-dfc", script, "pcl-gog-source", source)
+	cmd.Env = []string{"PATH=/usr/bin:/bin"}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", false
+	}
+	value := strings.TrimSuffix(string(out), ".")
+	if value == "" {
+		return "", false
+	}
+	return value, true
 }
 
 func IsMissingKeyringPasswordError(err error) bool {

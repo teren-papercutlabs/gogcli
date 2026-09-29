@@ -47,10 +47,9 @@ func Format(err error) string {
 	}
 
 	if secrets.IsMissingKeyringPasswordError(err) {
-		return `GOG_KEYRING_PASSWORD not set — export it to unlock gog's file keyring in this non-interactive session.
+		return `GOG_KEYRING_PASSWORD not set — gog could not unlock its file keyring in this non-interactive session.
 
-For PcL agent/clone sessions, load it from ~/.marshal/secrets.env before running gog:
-  set -a; source ~/.marshal/secrets.env; set +a
+For PcL agent sessions, gog reads GOG_KEYRING_PASSWORD, and only that name, from ~/.pcl/secrets.env when the environment does not carry it. Check that the file exists, is readable and declares GOG_KEYRING_PASSWORD. Do not source the whole file into your shell: it holds unrelated credentials.
 
 Then retry the gog command with --account <email>.`
 	}

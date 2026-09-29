@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -288,5 +290,34 @@ func TestSetSecretSetsLabel(t *testing.T) {
 
 	if it.Label != config.AppName {
 		t.Fatalf("expected label %q, got %q", config.AppName, it.Label)
+	}
+}
+
+func TestPclSecretsKeyringPasswordReadsOnlyThatName(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "secrets.env")
+	if err := os.WriteFile(source, []byte("export OTHER_SYNTHETIC='synthetic-other'\nexport GOG_KEYRING_PASSWORD='synthetic gog pass $(not run)'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := pclSecretsKeyringPassword(source)
+	if !ok || got != "synthetic gog pass $(not run)" {
+		t.Fatalf("expected the synthetic password, got ok=%v", ok)
+	}
+	if _, set := os.LookupEnv("OTHER_SYNTHETIC"); set {
+		t.Fatal("an unrelated name leaked into this process")
+	}
+}
+
+func TestPclSecretsKeyringPasswordAbsentOrUndeclared(t *testing.T) {
+	dir := t.TempDir()
+	if _, ok := pclSecretsKeyringPassword(filepath.Join(dir, "missing.env")); ok {
+		t.Fatal("a missing file must not yield a password")
+	}
+	source := filepath.Join(dir, "secrets.env")
+	if err := os.WriteFile(source, []byte("export OTHER_SYNTHETIC='x'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := pclSecretsKeyringPassword(source); ok {
+		t.Fatal("a file without the name must not yield a password")
 	}
 }
