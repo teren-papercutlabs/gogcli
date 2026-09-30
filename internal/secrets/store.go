@@ -138,12 +138,20 @@ func fileKeyringPasswordFuncFrom(password string, passwordSet bool, isTTY bool) 
 
 func fileKeyringPasswordFunc() keyring.PromptFunc {
 	password, passwordSet := os.LookupEnv(keyringPasswordEnv)
-	if !passwordSet {
-		if home, err := os.UserHomeDir(); err == nil {
-			password, passwordSet = pclSecretsKeyringPassword(filepath.Join(home, ".pcl", "secrets.env"))
-		}
+	isTTY := term.IsTerminal(int(os.Stdin.Fd()))
+	if passwordSet {
+		return fileKeyringPasswordFuncFrom(password, true, isTTY)
 	}
-	return fileKeyringPasswordFuncFrom(password, passwordSet, term.IsTerminal(int(os.Stdin.Fd())))
+	// Only the file backend ever calls this, so the secrets file is read only when a
+	// password is actually needed; the backend keeps it after the first success.
+	return func(prompt string) (string, error) {
+		if home, err := os.UserHomeDir(); err == nil {
+			if pw, ok := pclSecretsKeyringPassword(filepath.Join(home, ".pcl", "secrets.env")); ok {
+				return pw, nil
+			}
+		}
+		return fileKeyringPasswordFuncFrom("", false, isTTY)(prompt)
+	}
 }
 
 // pclSecretsKeyringPassword reads GOG_KEYRING_PASSWORD, and only that name, from PcL's
@@ -154,7 +162,7 @@ func pclSecretsKeyringPassword(source string) (string, bool) {
 	if _, err := os.Stat(source); err != nil {
 		return "", false
 	}
-	script := `unsetopt xtrace; source "$1" >/dev/null 2>&1 || exit 1; builtin print -rn -- "${GOG_KEYRING_PASSWORD-}."`
+	script := `unsetopt xtrace; source "$1" >/dev/null 2>&1 || exit 1; unsetopt xtrace; builtin print -rn -- "${GOG_KEYRING_PASSWORD-}."`
 	cmd := exec.Command("/bin/zsh", "-dfc", script, "pcl-gog-source", source)
 	cmd.Env = []string{"PATH=/usr/bin:/bin"}
 	out, err := cmd.Output()
