@@ -14,13 +14,36 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 )
 
 func TestDriveCommands_MoreCoverage(t *testing.T) {
 	origNew := newDriveService
-	t.Cleanup(func() { newDriveService = origNew })
+	origDocs := newDocsService
+	t.Cleanup(func() {
+		newDriveService = origNew
+		newDocsService = origDocs
+	})
+	docsSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, ":batchUpdate") {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"replies": []any{map[string]any{}}})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(docsSrv.Close)
+	docSvc, err := docs.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(docsSrv.Client()),
+		option.WithEndpoint(docsSrv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewDocsService: %v", err)
+	}
+	newDocsService = func(context.Context, string) (*docs.Service, error) { return docSvc, nil }
 
 	uploadMetas := make([]map[string]any, 0, 4)
 

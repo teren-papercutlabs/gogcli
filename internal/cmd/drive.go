@@ -354,6 +354,7 @@ type DriveUploadCmd struct {
 	KeepRevisionForever bool   `name:"keep-revision-forever" help:"Keep the new head revision forever (binary files only)"`
 	Convert             bool   `name:"convert" help:"Auto-convert to native Google format based on file extension (create only)"`
 	ConvertTo           string `name:"convert-to" help:"Convert to a specific Google format: doc|sheet|slides (create only)"`
+	Paged               bool   `name:"paged" help:"When creating a Google Doc, use pages (default is pageless)"`
 }
 
 func (c *DriveUploadCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -405,6 +406,9 @@ func (c *DriveUploadCmd) Run(ctx context.Context, flags *RootFlags) error {
 			return err
 		}
 	}
+	if c.Paged && (replaceFileID != "" || !convert || convertMimeType != driveMimeGoogleDoc) {
+		return usage("--paged applies only when creating a Google Doc")
+	}
 
 	svc, err := newDriveService(ctx, account)
 	if err != nil {
@@ -439,6 +443,16 @@ func (c *DriveUploadCmd) Run(ctx context.Context, flags *RootFlags) error {
 		created, createErr := createCall.Do()
 		if createErr != nil {
 			return createErr
+		}
+
+		createdMime := created.MimeType
+		if createdMime == "" {
+			createdMime = convertMimeType
+		}
+		if createdMime == driveMimeGoogleDoc {
+			if err := applyGoogleDocDocumentMode(ctx, account, created.Id, c.Paged); err != nil {
+				return err
+			}
 		}
 
 		if outfmt.IsJSON(ctx) {

@@ -33,6 +33,10 @@ func TestExecute_DocsSlidesSheets_CopyCreateInfoCat_JSON(t *testing.T) {
 		path := r.URL.Path
 		drivePath := strings.TrimPrefix(path, "/drive/v3")
 		switch {
+		case r.Method == http.MethodPost && strings.Contains(path, ":batchUpdate"):
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"replies": []any{map[string]any{}}})
+			return
 		case r.Method == http.MethodGet && strings.HasPrefix(path, "/v1/documents/"):
 			id := strings.TrimPrefix(path, "/v1/documents/")
 			w.Header().Set("Content-Type", "application/json")

@@ -118,10 +118,48 @@ func (c *DocsInfoCmd) Run(ctx context.Context, flags *RootFlags) error {
 	return nil
 }
 
+const (
+	documentModePageless  = "PAGELESS"
+	documentModePages     = "PAGES"
+	documentModeFieldMask = "documentFormat.documentMode"
+)
+
+// applyGoogleDocDocumentMode sets the Docs document mode after a new Google Doc exists.
+// The field mask is relative to DocumentStyle. documentStyle is not part of the mask.
+func applyGoogleDocDocumentMode(ctx context.Context, account, docID string, paged bool) error {
+	docID = strings.TrimSpace(docID)
+	if docID == "" {
+		return errors.New("empty document id")
+	}
+	mode := documentModePageless
+	if paged {
+		mode = documentModePages
+	}
+	docsSvc, err := newDocsService(ctx, account)
+	if err != nil {
+		return fmt.Errorf("set document mode %s on %s: %w", mode, docID, err)
+	}
+	_, err = docsSvc.Documents.BatchUpdate(docID, &docs.BatchUpdateDocumentRequest{
+		Requests: []*docs.Request{{
+			UpdateDocumentStyle: &docs.UpdateDocumentStyleRequest{
+				DocumentStyle: &docs.DocumentStyle{
+					DocumentFormat: &docs.DocumentFormat{DocumentMode: mode},
+				},
+				Fields: documentModeFieldMask,
+			},
+		}},
+	}).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("set document mode %s on %s: %w", mode, docID, err)
+	}
+	return nil
+}
+
 type DocsCreateCmd struct {
 	Title  string `arg:"" name:"title" help:"Doc title"`
 	Parent string `name:"parent" help:"Destination folder ID"`
 	File   string `name:"file" help:"Markdown file to import" type:"existingfile"`
+	Paged  bool   `name:"paged" help:"Create a paged document (default is pageless)"`
 }
 
 func (c *DocsCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -178,6 +216,10 @@ func (c *DocsCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 	if created == nil {
 		return errors.New("create failed")
+	}
+
+	if err := applyGoogleDocDocumentMode(ctx, account, created.Id, c.Paged); err != nil {
+		return err
 	}
 
 	// Pass 2: insert images if any were found.

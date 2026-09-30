@@ -39,6 +39,10 @@ func TestDocsCreateCopyCat_JSON(t *testing.T) {
 		path := r.URL.Path
 		drivePath := strings.TrimPrefix(path, "/drive/v3")
 		switch {
+		case strings.Contains(path, ":batchUpdate") && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"replies": []any{map[string]any{}}})
+			return
 		case strings.HasPrefix(path, "/v1/documents/") && r.Method == http.MethodGet:
 			id := strings.TrimPrefix(path, "/v1/documents/")
 			w.Header().Set("Content-Type", "application/json")
@@ -661,6 +665,10 @@ func TestDocsCreateCopyCat_Text(t *testing.T) {
 		path := r.URL.Path
 		drivePath := strings.TrimPrefix(path, "/drive/v3")
 		switch {
+		case strings.Contains(path, ":batchUpdate") && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"replies": []any{map[string]any{}}})
+			return
 		case strings.HasPrefix(path, "/v1/documents/") && r.Method == http.MethodGet:
 			id := strings.TrimPrefix(path, "/v1/documents/")
 			w.Header().Set("Content-Type", "application/json")
