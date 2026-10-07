@@ -186,9 +186,9 @@ func (c *SheetsUpdateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("empty range")
 	}
 
-	values, err := parseSheetsCLIValues(c.ValuesJSON, c.Values)
-	if err != nil {
-		return err
+	values, parseErr := parseSheetsCLIValues(c.ValuesJSON, c.Values)
+	if parseErr != nil {
+		return parseErr
 	}
 
 	valueInputOption := strings.TrimSpace(c.ValueInput)
@@ -273,9 +273,9 @@ func (c *SheetsAppendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("empty range")
 	}
 
-	values, err := parseSheetsCLIValues(c.ValuesJSON, c.Values)
-	if err != nil {
-		return err
+	values, parseErr := parseSheetsCLIValues(c.ValuesJSON, c.Values)
+	if parseErr != nil {
+		return parseErr
 	}
 
 	valueInputOption := strings.TrimSpace(c.ValueInput)
