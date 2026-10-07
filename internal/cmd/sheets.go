@@ -23,6 +23,37 @@ func cleanRange(r string) string {
 	return strings.ReplaceAll(r, `\!`, "!")
 }
 
+func parseSheetsCLIValues(valuesJSON string, valuesArgs []string) ([][]interface{}, error) {
+	var values [][]interface{}
+
+	switch {
+	case strings.TrimSpace(valuesJSON) != "":
+		b, err := resolveInlineOrFileBytes(valuesJSON)
+		if err != nil {
+			return nil, fmt.Errorf("read --values-json: %w", err)
+		}
+		if unmarshalErr := json.Unmarshal(b, &values); unmarshalErr != nil {
+			return nil, fmt.Errorf("invalid JSON values: %w", unmarshalErr)
+		}
+	case len(valuesArgs) > 0:
+		// Parse comma-separated rows, pipe-separated cells
+		rawValues := strings.Join(valuesArgs, " ")
+		rows := strings.Split(rawValues, ",")
+		for _, row := range rows {
+			cells := strings.Split(strings.TrimSpace(row), "|")
+			rowData := make([]interface{}, len(cells))
+			for i, cell := range cells {
+				rowData[i] = strings.TrimSpace(cell)
+			}
+			values = append(values, rowData)
+		}
+	default:
+		return nil, fmt.Errorf("provide values as args or via --values-json")
+	}
+
+	return values, nil
+}
+
 type SheetsCmd struct {
 	Get      SheetsGetCmd      `cmd:"" name:"get" aliases:"read,show" help:"Get values from a range"`
 	Update   SheetsUpdateCmd   `cmd:"" name:"update" aliases:"edit,set" help:"Update values in a range"`
@@ -155,31 +186,9 @@ func (c *SheetsUpdateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("empty range")
 	}
 
-	var values [][]interface{}
-
-	switch {
-	case strings.TrimSpace(c.ValuesJSON) != "":
-		b, err := resolveInlineOrFileBytes(c.ValuesJSON)
-		if err != nil {
-			return fmt.Errorf("read --values-json: %w", err)
-		}
-		if unmarshalErr := json.Unmarshal(b, &values); unmarshalErr != nil {
-			return fmt.Errorf("invalid JSON values: %w", unmarshalErr)
-		}
-	case len(c.Values) > 0:
-		// Parse comma-separated rows, pipe-separated cells
-		rawValues := strings.Join(c.Values, " ")
-		rows := strings.Split(rawValues, ",")
-		for _, row := range rows {
-			cells := strings.Split(strings.TrimSpace(row), "|")
-			rowData := make([]interface{}, len(cells))
-			for i, cell := range cells {
-				rowData[i] = strings.TrimSpace(cell)
-			}
-			values = append(values, rowData)
-		}
-	default:
-		return fmt.Errorf("provide values as args or via --values-json")
+	values, err := parseSheetsCLIValues(c.ValuesJSON, c.Values)
+	if err != nil {
+		return err
 	}
 
 	valueInputOption := strings.TrimSpace(c.ValueInput)
@@ -264,30 +273,9 @@ func (c *SheetsAppendCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("empty range")
 	}
 
-	var values [][]interface{}
-
-	switch {
-	case strings.TrimSpace(c.ValuesJSON) != "":
-		b, err := resolveInlineOrFileBytes(c.ValuesJSON)
-		if err != nil {
-			return fmt.Errorf("read --values-json: %w", err)
-		}
-		if unmarshalErr := json.Unmarshal(b, &values); unmarshalErr != nil {
-			return fmt.Errorf("invalid JSON values: %w", unmarshalErr)
-		}
-	case len(c.Values) > 0:
-		rawValues := strings.Join(c.Values, " ")
-		rows := strings.Split(rawValues, ",")
-		for _, row := range rows {
-			cells := strings.Split(strings.TrimSpace(row), "|")
-			rowData := make([]interface{}, len(cells))
-			for i, cell := range cells {
-				rowData[i] = strings.TrimSpace(cell)
-			}
-			values = append(values, rowData)
-		}
-	default:
-		return fmt.Errorf("provide values as args or via --values-json")
+	values, err := parseSheetsCLIValues(c.ValuesJSON, c.Values)
+	if err != nil {
+		return err
 	}
 
 	valueInputOption := strings.TrimSpace(c.ValueInput)
