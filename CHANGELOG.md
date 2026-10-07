@@ -8,6 +8,7 @@
 - Contacts: support `--org`, `--title`, `--url`, `--note`, and `--custom` on create/update; include custom fields in get output with deterministic ordering. (#199) — thanks @phuctm97.
 
 ### Fixed
+- Sheets: share update/append value parsing without changing inputs or requests (PCL-495).
 - Docs: reuse fixed Markdown regexes without changing parser output (PCL-495).
 - Secrets: show an actionable `GOG_KEYRING_PASSWORD` hint when the file keyring cannot unlock in non-interactive sessions.
 - Calendar: respond patches only attendees to avoid custom reminders validation errors. (#265) — thanks @sebasrodriguez.
