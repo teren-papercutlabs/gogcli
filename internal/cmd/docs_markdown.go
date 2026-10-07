@@ -71,6 +71,18 @@ func utf16Len(s string) int64 {
 	return int64(len(utf16.Encode([]rune(s))))
 }
 
+// gogMarkdown* regexes are the former per-call MustCompile literals,
+// compiled once. Names are prefixed to avoid package cmd collisions.
+var (
+	gogMarkdownNumberedListRe = regexp.MustCompile(`^(\d+)\.\s+(.+)`)
+	gogMarkdownLinkRe         = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	gogMarkdownInlineCodeRe   = regexp.MustCompile("`([^`]+)`")
+	gogMarkdownBoldItalicRe   = regexp.MustCompile(`\*\*\*([^*]+)\*\*\*`)
+	gogMarkdownBoldRe         = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	gogMarkdownItalicRe       = regexp.MustCompile(`\*([^*]+)\*`)
+	gogMarkdownHeadingRe      = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
+)
+
 // ParseMarkdown parses markdown text into structured elements
 func ParseMarkdown(text string) []MarkdownElement {
 	var elements []MarkdownElement
@@ -158,7 +170,7 @@ func ParseMarkdown(text string) []MarkdownElement {
 		}
 
 		// Numbered list
-		if match := regexp.MustCompile(`^(\d+)\.\s+(.+)`).FindStringSubmatch(line); match != nil {
+		if match := gogMarkdownNumberedListRe.FindStringSubmatch(line); match != nil {
 			elements = append(elements, MarkdownElement{
 				Type:    MDNumberedList,
 				Content: match[2],
@@ -305,8 +317,7 @@ func ParseInlineFormatting(text string) ([]TextStyle, string) {
 	var matches []InlineMatch
 
 	// Find all links [text](url)
-	linkRegex := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
-	for _, idx := range linkRegex.FindAllStringSubmatchIndex(text, -1) {
+	for _, idx := range gogMarkdownLinkRe.FindAllStringSubmatchIndex(text, -1) {
 		matches = append(matches, InlineMatch{
 			Start:   idx[0],
 			End:     idx[1],
@@ -317,8 +328,7 @@ func ParseInlineFormatting(text string) ([]TextStyle, string) {
 	}
 
 	// Find all inline code `code`
-	codeRegex := regexp.MustCompile("`([^`]+)`")
-	for _, idx := range codeRegex.FindAllStringSubmatchIndex(text, -1) {
+	for _, idx := range gogMarkdownInlineCodeRe.FindAllStringSubmatchIndex(text, -1) {
 		matches = append(matches, InlineMatch{
 			Start:   idx[0],
 			End:     idx[1],
@@ -328,8 +338,7 @@ func ParseInlineFormatting(text string) ([]TextStyle, string) {
 	}
 
 	// Find bold-italic ***text***
-	biRegex := regexp.MustCompile(`\*\*\*([^*]+)\*\*\*`)
-	for _, idx := range biRegex.FindAllStringSubmatchIndex(text, -1) {
+	for _, idx := range gogMarkdownBoldItalicRe.FindAllStringSubmatchIndex(text, -1) {
 		matches = append(matches, InlineMatch{
 			Start:   idx[0],
 			End:     idx[1],
@@ -339,8 +348,7 @@ func ParseInlineFormatting(text string) ([]TextStyle, string) {
 	}
 
 	// Find bold **text** (not overlapping with other patterns)
-	boldRegex := regexp.MustCompile(`\*\*([^*]+)\*\*`)
-	for _, idx := range boldRegex.FindAllStringSubmatchIndex(text, -1) {
+	for _, idx := range gogMarkdownBoldRe.FindAllStringSubmatchIndex(text, -1) {
 		overlaps := false
 		for _, m := range matches {
 			if idx[0] < m.End && idx[1] > m.Start {
@@ -369,8 +377,7 @@ func ParseInlineFormatting(text string) ([]TextStyle, string) {
 	}
 
 	// Find italic *text* but skip positions that are part of bold markers
-	italicRegex := regexp.MustCompile(`\*([^*]+)\*`)
-	for _, idx := range italicRegex.FindAllStringSubmatchIndex(text, -1) {
+	for _, idx := range gogMarkdownItalicRe.FindAllStringSubmatchIndex(text, -1) {
 		touchesBold := false
 		for i := idx[0]; i <= idx[1]; i++ {
 			if boldPositions[i] {
@@ -470,8 +477,7 @@ func nextRune(s string) (string, int) {
 }
 
 func parseHeading(line string) (int, string) {
-	headingRegex := regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
-	match := headingRegex.FindStringSubmatch(line)
+	match := gogMarkdownHeadingRe.FindStringSubmatch(line)
 	if match == nil {
 		return 0, ""
 	}
