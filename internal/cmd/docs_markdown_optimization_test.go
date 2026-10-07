@@ -68,8 +68,10 @@ func TestGogMarkdownFixedRegexReuse(t *testing.T) {
 func TestGogMarkdownRegexBehavior(t *testing.T) {
 	block := "###### H\n0. zero\n- bullet\n| A | B |\n| --- | --- |\n| x | y |\nAfter"
 	want := []MarkdownElement{
-		{Type: MDHeading6, Content: "H"}, {Type: MDNumberedList, Content: "zero"},
-		{Type: MDListItem, Content: "bullet"}, {Type: MDTable, TableCells: [][]string{{"A", "B"}, {"x", "y"}}},
+		{Type: MDHeading6, Content: "H"},
+		{Type: MDNumberedList, Content: "zero"},
+		{Type: MDListItem, Content: "bullet"},
+		{Type: MDTable, TableCells: [][]string{{"A", "B"}, {"x", "y"}}},
 		{Type: MDParagraph, Content: "After"},
 	}
 	if got := ParseMarkdown(block); !reflect.DeepEqual(got, want) {
@@ -82,8 +84,10 @@ func TestGogMarkdownRegexBehavior(t *testing.T) {
 		{"", "", []TextStyle{}},
 		{"*i*", "i", []TextStyle{{Italic: true, Start: 0, End: 1}}},
 		{"***both*** **b** *i* `c` [l](u)", "both b *i* c l", []TextStyle{
-			{Bold: true, Italic: true, Start: 0, End: 4}, {Bold: true, Start: 5, End: 6},
-			{Code: true, Start: 11, End: 12}, {Link: "u", Start: 13, End: 14},
+			{Bold: true, Italic: true, Start: 0, End: 4},
+			{Bold: true, Start: 5, End: 6},
+			{Code: true, Start: 11, End: 12},
+			{Link: "u", Start: 13, End: 14},
 		}},
 		{"[**b**](u) `**c**` ***d***", "**b** **c** d", []TextStyle{
 			{Link: "u", Start: 0, End: 5}, {Code: true, Start: 6, End: 11}, {Bold: true, Italic: true, Start: 12, End: 13},
